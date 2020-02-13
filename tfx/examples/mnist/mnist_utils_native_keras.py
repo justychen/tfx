@@ -60,7 +60,8 @@ def _get_serve_tf_examples_fn(model, tf_transform_output):
         parsed_features)
     transformed_features.pop(_transformed_name(_LABEL_KEY))
 
-    return model(transformed_features)
+    outputs = model(transformed_features)
+    return {'outputs': outputs}
 
   return serve_tf_examples_fn
 
