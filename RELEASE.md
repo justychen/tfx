@@ -24,6 +24,8 @@
 *   Fixed the Taxi Colab notebook.
 
 ### Deprecations
+*   Deprecated Model Validator (it's functionality is now provided by the
+    Evaluator).
 
 ## Breaking changes
 *   Remove "NOT_BLESSED" artifact.

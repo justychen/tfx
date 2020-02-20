@@ -521,7 +521,7 @@ If the new model is ready, make it so.
 
 * If you’re replacing a model that is currently in production, first make sure
 that the new one is better
-* ModelValidator tells the Pusher component if the model is OK
+* Evaluator tells the Pusher component if the model is OK
 * Pusher deploys SavedModels to well-known locations
 
 Deployment targets receive new models from well-known locations
@@ -533,7 +533,7 @@ Deployment targets receive new models from well-known locations
 
 ### Components
 
-* [ModelValidator](https://www.tensorflow.org/tfx/guide/modelval)
+* [Evaluator](https://www.tensorflow.org/tfx/guide/evaluator)
 ensures that the model is "good enough" to be pushed to production.
 * [Pusher](https://www.tensorflow.org/tfx/guide/pusher)
 deploys the model to a serving infrastructure.
