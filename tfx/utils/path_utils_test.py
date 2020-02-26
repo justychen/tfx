@@ -30,16 +30,15 @@ class PathUtilsTest(tf.test.TestCase):
   def testEstimatorModelPath(self):
     # Create folders based on Estimator based Trainer output model directory.
     output_uri = os.path.join(self.get_temp_dir(), 'model_dir')
-    eval_model_path = os.path.join(output_uri, 'eval_model_dir', 'MODEL')
+    eval_model_path = os.path.join(output_uri, 'eval_model_dir', '1582798459')
     tf.io.gfile.makedirs(eval_model_path)
     serving_model_path = os.path.join(output_uri, 'serving_model_dir', 'export',
-                                      'taxi', '123')
+                                      'taxi', '1582798459')
     tf.io.gfile.makedirs(serving_model_path)
     # Test retrieving model folder.
     self.assertEqual(eval_model_path, path_utils.eval_model_path(output_uri))
     self.assertEqual(serving_model_path,
                      path_utils.serving_model_path(output_uri))
-    self.assertEqual('123', path_utils.get_serving_model_version(output_uri))
 
   def testKerasModelPath(self):
     # Create folders based on Keras based Trainer output model directory.
@@ -50,7 +49,6 @@ class PathUtilsTest(tf.test.TestCase):
     self.assertEqual(serving_model_path, path_utils.eval_model_path(output_uri))
     self.assertEqual(serving_model_path,
                      path_utils.serving_model_path(output_uri))
-    self.assertTrue(path_utils.get_serving_model_version(output_uri).isdigit())
 
 
 if __name__ == '__main__':
