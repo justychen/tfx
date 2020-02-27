@@ -17,7 +17,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import enum
 from typing import Union
 
 from tensorflow_serving.apis import classification_pb2
@@ -29,14 +28,3 @@ TensorFlowServingRequest = Union[
 ]
 
 Request = Union[TensorFlowServingRequest]
-
-
-class ModelServingStatus(enum.Enum):
-  """Serving status of the model in the model server."""
-  # Model is not ready yet but will be ready soon.
-  NOT_READY = 1
-  # Model is ready.
-  READY = 2
-  # Failed to load a model and will not be recovered. Indicates infra validation
-  # failure.
-  UNAVAILABLE = 3

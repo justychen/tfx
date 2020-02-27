@@ -20,22 +20,20 @@ from __future__ import print_function
 import grpc
 import mock
 import tensorflow as tf
-from typing import Any, Dict, Text
 
 from google.protobuf import json_format
 from tensorflow_serving.apis import classification_pb2
 from tensorflow_serving.apis import get_model_status_pb2
 from tensorflow_serving.apis import regression_pb2
-from tfx.components.infra_validator import error_types
-from tfx.components.infra_validator import types
+from tfx.components.infra_validator.model_server_clients import base_client
 from tfx.components.infra_validator.model_server_clients import tensorflow_serving_client
 
-
-def _make_response(
-    payload: Dict[Text, Any]) -> get_model_status_pb2.GetModelStatusResponse:
-  result = get_model_status_pb2.GetModelStatusResponse()
-  json_format.ParseDict(payload, result)
-  return result
+TensorFlowServingClient = tensorflow_serving_client.TensorFlowServingClient
+GetModelStatusResponse = get_model_status_pb2.GetModelStatusResponse
+LOADING = get_model_status_pb2.ModelVersionStatus.State.LOADING
+AVAILABLE = get_model_status_pb2.ModelVersionStatus.State.AVAILABLE
+END = get_model_status_pb2.ModelVersionStatus.State.END
+ModelState = base_client.ModelState
 
 
 class TensorflowServingClientTest(tf.test.TestCase):
@@ -54,96 +52,94 @@ class TensorflowServingClientTest(tf.test.TestCase):
     self.model_stub_patcher.stop()
     self.prediction_stub_patcher.stop()
 
-  def testGetModelState_ReturnsReady_IfAllAvailable(self):
+  @staticmethod
+  def _CreateResponse(payload):
+    return json_format.ParseDict(payload, GetModelStatusResponse())
+
+  def testGetModelState_ReturnsAvailable_IfAllAvailable(self):
     # Prepare stub and client.
-    self.model_stub.GetModelStatus.return_value = _make_response({
+    self.model_stub.GetModelStatus.return_value = self._CreateResponse({
         'model_version_status': [
-            {'state': 'AVAILABLE'},
-            {'state': 'AVAILABLE'},
-            {'state': 'AVAILABLE'}
+            {'state': AVAILABLE},
+            {'state': AVAILABLE},
+            {'state': AVAILABLE}
         ]
     })
-    client = tensorflow_serving_client.TensorFlowServingClient(
-        'localhost:1234', 'a_model_name')
+    client = TensorFlowServingClient('localhost:1234', 'a_model_name')
 
     # Call.
-    result = client._GetServingStatus()
+    result = client.GetModelState()
 
     # Check result.
-    self.assertEqual(result, types.ModelServingStatus.READY)
+    self.assertEqual(result, ModelState.AVAILABLE)
 
   def testGetModelState_ReturnsNotReady_IfAnyStateNotAvailable(self):
     # Prepare stub and client.
-    self.model_stub.GetModelStatus.return_value = _make_response({
+    self.model_stub.GetModelStatus.return_value = self._CreateResponse({
         'model_version_status': [
-            {'state': 'AVAILABLE'},
-            {'state': 'AVAILABLE'},
-            {'state': 'LOADING'}
+            {'state': AVAILABLE},
+            {'state': AVAILABLE},
+            {'state': LOADING}
         ]
     })
-    client = tensorflow_serving_client.TensorFlowServingClient(
-        'localhost:1234', 'a_model_name')
+    client = TensorFlowServingClient('localhost:1234', 'a_model_name')
 
     # Call.
-    result = client._GetServingStatus()
+    result = client.GetModelState()
 
     # Check result.
-    self.assertEqual(result, types.ModelServingStatus.NOT_READY)
+    self.assertEqual(result, ModelState.NOT_READY)
 
   def testGetModelState_ReturnsUnavailable_IfAnyStateEnded(self):
     # Prepare stub and client.
-    self.model_stub.GetModelStatus.return_value = _make_response({
+    self.model_stub.GetModelStatus.return_value = self._CreateResponse({
         'model_version_status': [
-            {'state': 'AVAILABLE'},
-            {'state': 'AVAILABLE'},
-            {'state': 'END'}
+            {'state': AVAILABLE},
+            {'state': AVAILABLE},
+            {'state': END}
         ]
     })
-    client = tensorflow_serving_client.TensorFlowServingClient(
-        'localhost:1234', 'a_model_name')
+    client = TensorFlowServingClient('localhost:1234', 'a_model_name')
 
     # Call.
-    result = client._GetServingStatus()
+    result = client.GetModelState()
 
     # Check result.
-    self.assertEqual(result, types.ModelServingStatus.UNAVAILABLE)
+    self.assertEqual(result, ModelState.UNAVAILABLE)
 
   def testGetModelState_ReturnsNotReady_IfEmptyState(self):
     # Prepare stub and client.
-    self.model_stub.GetModelStatus.return_value = _make_response({
+    self.model_stub.GetModelStatus.return_value = self._CreateResponse({
         'model_version_status': []  # Empty
     })
-    client = tensorflow_serving_client.TensorFlowServingClient(
-        'localhost:1234', 'a_model_name')
+    client = TensorFlowServingClient('localhost:1234', 'a_model_name')
 
     # Calls
-    result = client._GetServingStatus()
+    result = client.GetModelState()
 
     # Check result.
-    self.assertEqual(result, types.ModelServingStatus.NOT_READY)
+    self.assertEqual(result, ModelState.NOT_READY)
 
   def testGetModelState_ReturnsNotReady_IfServerUnavailable(self):
     # Prepare stub and client.
     self.model_stub.GetModelStatus.side_effect = grpc.RpcError
-    client = tensorflow_serving_client.TensorFlowServingClient(
-        'localhost:1234', 'a_model_name')
+    client = TensorFlowServingClient('localhost:1234', 'a_model_name')
 
     # Call.
-    result = client._GetServingStatus()
+    result = client.GetModelState()
 
     # Check result.
-    self.assertEqual(result, types.ModelServingStatus.NOT_READY)
+    self.assertEqual(result, ModelState.NOT_READY)
 
   def testIssueRequests_NoErrorIfSucceeded(self):
     # Prepare requests and client.
     r1 = classification_pb2.ClassificationRequest()
     r2 = classification_pb2.ClassificationRequest()
     r3 = regression_pb2.RegressionRequest()
-    client = tensorflow_serving_client.TensorFlowServingClient(
-        'localhost:1234', 'a_model_name')
+    client = TensorFlowServingClient('localhost:1234', 'a_model_name')
 
     # Call.
-    client.SendRequests([r1, r2, r3])
+    client.IssueRequests([r1, r2, r3])
 
     # Check calls
     self.prediction_stub.Classify.assert_called_with(r1)
@@ -153,23 +149,21 @@ class TensorflowServingClientTest(tf.test.TestCase):
   def testIssueRequests_RaiseValueErrorOnUnrecognizedRequestType(self):
     # Prepare requests and client.
     not_a_request = 'i am a request'
-    client = tensorflow_serving_client.TensorFlowServingClient(
-        'localhost:1234', 'a_model_name')
+    client = TensorFlowServingClient('localhost:1234', 'a_model_name')
 
     # Call
-    with self.assertRaises(error_types.ValidationFailed):
-      client.SendRequests([not_a_request])
+    with self.assertRaisesRegexp(ValueError, 'Unsupported request type'):
+      client.IssueRequests([not_a_request])
 
   def testIssueRequests_RaiseRpcErrorIfRpcFailed(self):
     # Prepare client and a side effect.
     request = classification_pb2.ClassificationRequest()
-    client = tensorflow_serving_client.TensorFlowServingClient(
-        'localhost:1234', 'a_model_name')
+    client = TensorFlowServingClient('localhost:1234', 'a_model_name')
     self.prediction_stub.Classify.side_effect = grpc.RpcError
 
     # Call.
-    with self.assertRaises(error_types.ValidationFailed):
-      client.SendRequests([request])
+    with self.assertRaises(grpc.RpcError):
+      client.IssueRequests([request])
 
 
 if __name__ == '__main__':

@@ -19,7 +19,7 @@ from __future__ import print_function
 
 from absl import logging
 import grpc
-from typing import Text
+from typing import List, Text
 
 from tensorflow_serving.apis import classification_pb2
 from tensorflow_serving.apis import get_model_status_pb2
@@ -30,7 +30,8 @@ from tensorflow_serving.apis import regression_pb2
 from tfx.components.infra_validator import types
 from tfx.components.infra_validator.model_server_clients import base_client
 
-State = get_model_status_pb2.ModelVersionStatus.State
+ModelState = base_client.ModelState
+TfServingState = get_model_status_pb2.ModelVersionStatus.State
 
 
 class TensorFlowServingClient(base_client.BaseModelServerClient):
@@ -59,12 +60,12 @@ class TensorFlowServingClient(base_client.BaseModelServerClient):
         model_spec=model_pb2.ModelSpec(name=self._model_name))
     return self._model_service.GetModelStatus(request)
 
-  def _GetServingStatus(self) -> types.ModelServingStatus:
+  def GetModelState(self) -> ModelState:
     """Check whether the model is available for query or not.
 
-    In TensorFlow Serving, model is READY if and only if the state from
-    _GetModelStatus() is AVAILABLE. If returned state is END, it will never
-    become READY therefore returns UNAVAILABLE. Otherwise it will return
+    In TensorFlow Serving, model is AVAILABLE if and only if the state from
+    GetModelStatus() is AVAILABLE. If returned state is END, it will never
+    become AVAILABLE therefore returns UNAVAILABLE. Otherwise it will return
     NOT_READY.
 
     Returns:
@@ -74,11 +75,11 @@ class TensorFlowServingClient(base_client.BaseModelServerClient):
       resp = self._GetModelStatus()
     except grpc.RpcError as e:
       logging.error(e)
-      return types.ModelServingStatus.NOT_READY
+      return ModelState.NOT_READY
 
     # When no versions available. (empty list)
     if not resp.model_version_status:
-      return types.ModelServingStatus.NOT_READY
+      return ModelState.NOT_READY
 
     # Wait until all serving model versions are in AVAILABLE state.
     # In TensorFlow Serving, model state lifecycle is
@@ -88,19 +89,22 @@ class TensorFlowServingClient(base_client.BaseModelServerClient):
     # if loaded unsuccessfully. The model is available iff state is AVAILABLE.
     # The model is unavailable for goods iff state is END.
     # https://github.com/tensorflow/serving/blob/master/tensorflow_serving/apis/get_model_status.proto
-    if all(mvs.state == State.AVAILABLE
+    if all(mvs.state == TfServingState.AVAILABLE
            for mvs in resp.model_version_status):
-      return types.ModelServingStatus.READY
-    if any(mvs.state == State.END
+      return ModelState.AVAILABLE
+    if any(mvs.state == TfServingState.END
            for mvs in resp.model_version_status):
-      return types.ModelServingStatus.UNAVAILABLE
-    return types.ModelServingStatus.NOT_READY
+      return ModelState.UNAVAILABLE
+    return ModelState.NOT_READY
 
-  def _SendRequest(self, request: types.Request) -> None:
-    if isinstance(request, classification_pb2.ClassificationRequest):
-      self._prediction_service.Classify(request)
-    elif isinstance(request, regression_pb2.RegressionRequest):
-      self._prediction_service.Regress(request)
-    else:
-      raise NotImplementedError('Unsupported request type {}'.format(
-          type(request).__name__))
+  def IssueRequests(self, requests: List[types.Request]) -> None:
+    """Issue requests against model server."""
+    for request in requests:
+      logging.info('Sending request %s', request)
+      if isinstance(request, classification_pb2.ClassificationRequest):
+        self._prediction_service.Classify(request)
+      elif isinstance(request, regression_pb2.RegressionRequest):
+        self._prediction_service.Regress(request)
+      else:
+        raise ValueError('Unsupported request type {}'.format(
+            type(request).__name__))
