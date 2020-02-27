@@ -50,6 +50,7 @@ class TemplateHandlerTest(tf.test.TestCase):
     with open(os.path.join(test_dir, 'configs.py')) as fp:
       configs_py_content = fp.read()
     self.assertIn(pipeline_name, configs_py_content)
+    self.assertNotIn('# TODO(b/', configs_py_content)
     with open(os.path.join(test_dir, 'model.py')) as fp:
       model_py_content = fp.read()
     self.assertNotIn('from tfx.experimental.templates.taxi import',
