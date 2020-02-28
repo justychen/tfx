@@ -24,7 +24,8 @@ from typing import Text
 
 import tensorflow as tf
 
-from tfx.utils import io_utils
+from tfx.utils.model_paths import tf_estimator_exporter_flavor
+from tfx.utils.model_paths import tfma_eval_saved_model_flavor
 
 EVAL_MODEL_DIR = 'eval_model_dir'
 SERVING_MODEL_DIR = 'serving_model_dir'
@@ -60,11 +61,12 @@ def eval_model_dir(output_uri: Text) -> Text:
 def eval_model_path(output_uri: Text) -> Text:
   """Returns path to timestamped exported model for evaluation purpose."""
   model_dir = eval_model_dir(output_uri)
-  if tf.io.gfile.exists(model_dir):
-    return io_utils.get_only_uri_in_dir(model_dir)
-  else:
+  try:
+    return tfma_eval_saved_model_flavor.lookup_only_model_path(
+        export_dir_base=model_dir).model_path
+  except tf.errors.NotFoundError:
     # If eval model doesn't exist, use serving model for eval.
-    return serving_model_dir(output_uri)
+    return serving_model_path(output_uri)
 
 
 def serving_model_dir(output_uri: Text) -> Text:
@@ -74,13 +76,13 @@ def serving_model_dir(output_uri: Text) -> Text:
 
 def serving_model_path(output_uri: Text) -> Text:
   """Returns path for timestamped and named serving model exported."""
-  export_dir = os.path.join(serving_model_dir(output_uri), 'export')
-  if tf.io.gfile.exists(export_dir):
-    model_dir = io_utils.get_only_uri_in_dir(export_dir)
-    return io_utils.get_only_uri_in_dir(model_dir)
-  else:
+  model_dir = serving_model_dir(output_uri)
+  try:
+    return tf_estimator_exporter_flavor.lookup_only_model_path(
+        export_path=model_dir).model_path
+  except tf.errors.NotFoundError:
     # If dir doesn't match estimator structure, use serving model root directly.
-    return serving_model_dir(output_uri)
+    return model_dir
 
 
 def get_serving_model_version(output_uri: Text) -> Text:
