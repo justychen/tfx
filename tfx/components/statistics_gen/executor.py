@@ -23,6 +23,7 @@ from typing import Any, Dict, List, Text
 
 import absl
 import apache_beam as beam
+import six
 from tensorflow_data_validation.api import stats_api
 from tensorflow_data_validation.coders import tf_example_decoder
 from tensorflow_data_validation.statistics import stats_options as options
@@ -32,10 +33,14 @@ from tfx import types
 from tfx.components.base import base_executor
 from tfx.types import artifact_utils
 from tfx.utils import io_utils
+from tfx.utils import json_utils
 
 
 # Key for examples in executor input_dict.
 EXAMPLES_KEY = 'examples'
+
+# Key for stats_options in the executor input_dict
+STATS_OPTIONS = 'stats_options'
 
 # Key for output statistics in executor output_dict.
 STATISTICS_KEY = 'statistics'
@@ -80,8 +85,13 @@ class Executor(base_executor.BaseExecutor):
         uri = os.path.join(artifact.uri, split)
         split_uris.append((split, uri))
     with self._make_beam_pipeline() as p:
-      # TODO(b/126263006): Support more stats_options through config.
-      stats_options = options.StatsOptions()
+      if STATS_OPTIONS in exec_properties:
+        stats_options = exec_properties[STATS_OPTIONS]
+        if isinstance(stats_options, six.string_types):
+          stats_options = json_utils.loads(stats_options)
+      else:
+        stats_options = options.StatsOptions()
+
       for split, uri in split_uris:
         absl.logging.info('Generating statistics for split {}'.format(split))
         input_uri = io_utils.all_files_pattern(uri)

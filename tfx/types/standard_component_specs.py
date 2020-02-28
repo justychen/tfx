@@ -20,6 +20,8 @@ from __future__ import print_function
 
 from typing import Any, Dict, List, Text
 
+import tensorflow_data_validation as tfdv
+
 import tensorflow_model_analysis as tfma
 from tfx.proto import bulk_inferrer_pb2
 from tfx.proto import evaluator_pb2
@@ -253,7 +255,10 @@ class SchemaGenSpec(ComponentSpec):
 class StatisticsGenSpec(ComponentSpec):
   """StatisticsGen component spec."""
 
-  PARAMETERS = {}
+  PARAMETERS = {
+      'stats_options':
+          ExecutionParameter(type=tfdv.StatsOptions, optional=True),
+  }
   INPUTS = {
       'examples': ChannelParameter(type=standard_artifacts.Examples),
   }
