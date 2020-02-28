@@ -24,7 +24,7 @@ import tempfile
 import mock
 import six
 
-import tensorflow.compat.v1 as tf
+import tensorflow as tf
 
 from tfx.components.trainer.rewriting import rewriter
 from tfx.components.trainer.rewriting import tflite_rewriter
@@ -121,4 +121,5 @@ class TFLiteRewriterTest(tf.test.TestCase):
 
 
 if __name__ == '__main__':
+  tf.enable_v2_behavior()
   tf.test.main()
